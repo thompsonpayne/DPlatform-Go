@@ -1,0 +1,16 @@
+package web
+
+import "rplatform-echo/cmd/web/components/form"
+
+templ ErrorMsg(msg string) {
+	<!-- <div class="bg-red-50 text-red-500" id="error-msg"> -->
+	<!-- 	{ msg } -->
+	<!-- </div> -->
+	<div class="py-1 px-2 bg-red-100 rounded-sm first-letter:uppercase">
+		@form.Message(form.MessageProps{
+			Variant: form.MessageVariantError,
+		}) {
+			{ msg }
+		}
+	</div>
+}

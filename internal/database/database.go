@@ -1,3 +1,4 @@
+// Package database
 package database
 
 import (
@@ -11,6 +12,7 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/pressly/goose/v3"
 )
 
 // Service represents a service that interacts with a database.
@@ -22,6 +24,12 @@ type Service interface {
 	// Close terminates the database connection.
 	// It returns an error if the connection cannot be closed.
 	Close() error
+
+	// InitSchema runs database migrations.
+	InitSchema() error
+
+	// GetDB returns the raw database connection for use with sqlc
+	GetDB() *sql.DB
 }
 
 type service struct {
@@ -110,4 +118,25 @@ func (s *service) Health() map[string]string {
 func (s *service) Close() error {
 	log.Printf("Disconnected from database: %s", dburl)
 	return s.db.Close()
+}
+
+// InitSchema runs database migrations to ensure schema is up to date.
+func (s *service) InitSchema() error {
+	// Set up goose
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return fmt.Errorf("error goosing sqlite3 %v", err)
+	}
+
+	// Run migrations
+	if err := goose.Up(s.db, "internal/database/migrations"); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	log.Println("Database migrations completed successfully")
+	return nil
+}
+
+// GetDB returns the raw database connection for use with sqlc
+func (s *service) GetDB() *sql.DB {
+	return s.db
 }

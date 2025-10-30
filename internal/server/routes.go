@@ -1,17 +1,20 @@
 package server
 
 import (
-	"net/http"
-
-	"fmt"
+	"context"
 	"log"
-	"time"
+	"net/http"
+	"os"
+
+	"rplatform-echo/cmd/web"
+	"rplatform-echo/internal/ws"
 
 	"github.com/a-h/templ"
-	"github.com/coder/websocket"
+	"github.com/golang-jwt/jwt/v5"
+
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"rplatform-echo/cmd/web"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -33,6 +36,72 @@ func (s *Server) RegisterRoutes() http.Handler {
 	e.GET("/web", echo.WrapHandler(templ.Handler(web.HelloForm())))
 	e.POST("/hello", echo.WrapHandler(http.HandlerFunc(web.HelloWebHandler)))
 
+	e.GET("/auth", echo.WrapHandler(templ.Handler(web.Auth())))
+	auth := e.Group("/auth")
+	auth.POST("/login", s.loginHandler)
+	auth.POST("/register", s.registerHanlder)
+	auth.POST("/logout", s.logOutHandler)
+
+	d := e.Group("/dashboard")
+	{
+
+		d.Use(echojwt.WithConfig(echojwt.Config{
+			TokenLookup: "header:Authorization:Bearer ,cookie:jwt_token",
+			SigningKey:  []byte(os.Getenv("JWT_SECRET")),
+			ErrorHandler: func(c echo.Context, err error) error {
+				return c.Redirect(http.StatusFound, "/auth")
+			},
+		}))
+
+		// d.GET("", echo.WrapHandler(templ.Handler(web.DashBoard())))
+		// d.GET("", echo.WrapHandler(templ.Handler(web.DashBoard())))
+		d.GET("", func(c echo.Context) error {
+			templ.Handler(web.DashBoard()).ServeHTTP(c.Response(), c.Request())
+			return nil
+		})
+
+		d.GET("/api/room", func(c echo.Context) error {
+			rooms, err := s.getAllRoom(c)
+			if err != nil {
+				if err := web.Render(c, http.StatusInternalServerError, web.ErrorMsg(err.Error())); err != nil {
+					return err
+				}
+				return err
+				// templ.Handler(web.ErrorMsg(err.Error())).ServeHTTP(c.Response(), c.Request())
+			}
+			// templ.Handler(web.Rooms(rooms)).ServeHTTP(c.Response(), c.Request())
+			err = web.Render(c, http.StatusOK, web.Rooms(rooms))
+			return err
+		})
+
+		d.POST("/api/room", func(c echo.Context) error {
+			room, err := s.createRoom(c)
+			if err != nil {
+				c.Response().Header().Set("HX-Retarget", "#create-room-error-container")
+				// templ.Handler(web.ErrorMsg(err.Error())).ServeHTTP(c.Response(), c.Request())
+				if err := web.Render(c, http.StatusBadRequest, web.ErrorMsg(err.Error())); err != nil {
+					log.Println("Error create room", err)
+				}
+				return nil
+			}
+			// templ.Handler(web.Room(&room)).ServeHTTP(c.Response(), c.Request())
+			return web.Render(c, http.StatusOK, web.Room(&room))
+		})
+
+		d.DELETE("/api/room", func(c echo.Context) error {
+			id := c.QueryParam("id")
+			return s.deleteRoom(c, id)
+		})
+
+		hub := ws.NewHub()
+		go hub.Run(context.Background())
+		d.GET("/chatroom", func(c echo.Context) error {
+			user := c.Get("user").(*jwt.Token)
+			claims := user.Claims.(jwt.MapClaims)
+			return ws.ServeWs(hub, c.Response(), c.Request(), claims)
+		})
+	}
+
 	e.GET("/", s.HelloWorldHandler)
 
 	e.GET("/health", s.healthHandler)
@@ -40,44 +109,4 @@ func (s *Server) RegisterRoutes() http.Handler {
 	e.GET("/websocket", s.websocketHandler)
 
 	return e
-}
-
-func (s *Server) HelloWorldHandler(c echo.Context) error {
-	resp := map[string]string{
-		"message": "Hello World",
-	}
-
-	return c.JSON(http.StatusOK, resp)
-}
-
-func (s *Server) healthHandler(c echo.Context) error {
-	return c.JSON(http.StatusOK, s.db.Health())
-}
-
-func (s *Server) websocketHandler(c echo.Context) error {
-	w := c.Response().Writer
-	r := c.Request()
-	socket, err := websocket.Accept(w, r, nil)
-
-	if err != nil {
-		log.Printf("could not open websocket: %v", err)
-		_, _ = w.Write([]byte("could not open websocket"))
-		w.WriteHeader(http.StatusInternalServerError)
-		return nil
-	}
-
-	defer socket.Close(websocket.StatusGoingAway, "server closing websocket")
-
-	ctx := r.Context()
-	socketCtx := socket.CloseRead(ctx)
-
-	for {
-		payload := fmt.Sprintf("server timestamp: %d", time.Now().UnixNano())
-		err := socket.Write(socketCtx, websocket.MessageText, []byte(payload))
-		if err != nil {
-			break
-		}
-		time.Sleep(time.Second * 2)
-	}
-	return nil
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -20,10 +21,17 @@ type Server struct {
 
 func NewServer() *http.Server {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
+
+	db := database.New()
+	// Initialize database schema
+	if err := db.InitSchema(); err != nil {
+		log.Fatalf("Failed to initialize database schema: %v", err)
+	}
+
 	NewServer := &Server{
 		port: port,
 
-		db: database.New(),
+		db: db,
 	}
 
 	// Declare Server config

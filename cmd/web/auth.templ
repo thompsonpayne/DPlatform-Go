@@ -1,0 +1,48 @@
+package web
+
+templ Auth() {
+	@Base() {
+		<form hx-post="/auth/register" hx-swap="outerHTML" hx-target="#register-error-el" class="space-y-3">
+			<h1>Register</h1>
+			<div>
+				<label for="email">Email</label>
+				<input class="border-slate-300 border-1" id="email" name="email" type="text" required/>
+			</div>
+			<div>
+				<label for="password">Password</label>
+				<input id="password" name="password" class="border-slate-300 border-1" type="text" required/>
+			</div>
+			<button type="submit" class="border-slate-300 bg-cyan-100 text-slate-900">Register</button>
+			<div id="register-error-el"></div>
+		</form>
+		<form hx-post="/auth/login" hx-swap="outerHTML" hx-target="#login-error-el" class="space-y-3 mt-10">
+			<h2>Login</h2>
+			<div>
+				<label for="email">Email</label>
+				<input id="email" name="email" type="text" class="border-slate-300 border-1" required/>
+			</div>
+			<div>
+				<label for="password">Password</label>
+				<input id="password" name="password" type="text" class="border-slate-300 border-1" required/>
+			</div>
+			<button class="border-slate-300 bg-cyan-100 text-slate-900" type="submit">Login</button>
+			<div id="login-error-el"></div>
+		</form>
+	}
+}
+
+templ UserResponse(name string, email string, err string) {
+	@Base() {
+		if (err != "") {
+			<div class="text-red-500 bg-red-50">
+				<span class="text-red-500">{ err }</span>
+			</div>
+		} else {
+			<div class="text-green-900 bg-green-50 text-bold">
+				Success
+				<span>{ name }</span>
+				<span>{ email }</span>
+			</div>
+		}
+	}
+}

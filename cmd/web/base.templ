@@ -1,17 +1,21 @@
 package web
 
+import "rplatform-echo/cmd/web/components/toast"
+
 templ Base() {
 	<!DOCTYPE html>
-	<html lang="en" class="h-screen">
+	<html lang="en" class="h-screen dark">
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width,initial-scale=1"/>
 			<title>Go Blueprint Hello</title>
 			<link href="assets/css/output.css" rel="stylesheet"/>
 			<script src="assets/js/htmx.min.js"></script>
+			<script src="https://cdn.jsdelivr.net/npm/htmx-ext-ws@2.0.4" integrity="sha384-1RwI/nvUSrMRuNj7hX1+27J8XDdCoSLf0EjEyF69nacuWyiJYoQ/j39RT1mSnd2G" crossorigin="anonymous"></script>
+			@toast.Script()
 		</head>
-		<body class="bg-gray-100">
-			<main class="max-w-sm mx-auto p-4">
+		<body class="bg-[#1A1B27]">
+			<main class="max-w-sm mx-auto p-4 ">
 				{ children... }
 			</main>
 		</body>

@@ -1,0 +1,7 @@
+{
+  "componentsDir": "cmd/web/components",
+  "utilsDir": "cmd/web/utils",
+  "moduleName": "rplatform-echo",
+  "jsDir": "assets/js",
+  "jsPublicPath": "assets/js"
+}

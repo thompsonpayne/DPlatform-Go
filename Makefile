@@ -25,7 +25,7 @@ build: tailwind-install templ-install
 	@echo "Building..."
 	@templ generate
 	@./tailwindcss -i cmd/web/styles/input.css -o cmd/web/assets/css/output.css
-	@CGO_ENABLED=1 GOOS=linux go build -o main cmd/api/main.go
+	@CGO_ENABLED=1 go build -o main cmd/api/main.go
 
 # Run the application
 run:

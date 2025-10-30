@@ -3,10 +3,13 @@ package web
 templ HelloForm() {
 	@Base() {
 		<form hx-post="/hello" method="POST" hx-target="#hello-container">
-			<input class="bg-gray-200 text-black p-2 border border-gray-400 rounded-lg"id="name" name="name" type="text"/>
+			<input class="bg-gray-200 text-black p-2 border border-gray-400 rounded-lg" id="name" name="name" type="text"/>
 			<button type="submit" class="bg-orange-500 hover:bg-orange-700 text-white py-2 px-4 rounded">Submit</button>
 		</form>
 		<div id="hello-container"></div>
+		<button data-on:click="alert('I’m sorry, Dave. I’m afraid I can’t do that.')">
+			Open the pod bay doors, HAL.
+		</button>
 	}
 }
 

@@ -1,8 +1,6 @@
 package server
 
 import (
-	"context"
-	"log"
 	"net/http"
 	"os"
 
@@ -10,7 +8,6 @@ import (
 	"rplatform-echo/internal/ws"
 
 	"github.com/a-h/templ"
-	"github.com/golang-jwt/jwt/v5"
 
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
@@ -36,11 +33,13 @@ func (s *Server) RegisterRoutes() http.Handler {
 	e.GET("/web", echo.WrapHandler(templ.Handler(web.HelloForm())))
 	e.POST("/hello", echo.WrapHandler(http.HandlerFunc(web.HelloWebHandler)))
 
-	e.GET("/auth", echo.WrapHandler(templ.Handler(web.Auth())))
-	auth := e.Group("/auth")
-	auth.POST("/login", s.loginHandler)
-	auth.POST("/register", s.registerHanlder)
-	auth.POST("/logout", s.logOutHandler)
+	e.GET("/auth", s.authHandler)
+	{
+		auth := e.Group("/auth")
+		auth.POST("/login", s.loginHandler)
+		auth.POST("/register", s.registerHanlder)
+		auth.POST("/logout", s.logOutHandler)
+	}
 
 	d := e.Group("/dashboard")
 	{
@@ -56,49 +55,34 @@ func (s *Server) RegisterRoutes() http.Handler {
 		// d.GET("", echo.WrapHandler(templ.Handler(web.DashBoard())))
 		// d.GET("", echo.WrapHandler(templ.Handler(web.DashBoard())))
 		d.GET("", func(c echo.Context) error {
-			templ.Handler(web.DashBoard()).ServeHTTP(c.Response(), c.Request())
-			return nil
+			return web.Render(c, http.StatusOK, web.DashBoard())
 		})
 
-		d.GET("/api/room", func(c echo.Context) error {
-			rooms, err := s.getAllRoom(c)
-			if err != nil {
-				if err := web.Render(c, http.StatusInternalServerError, web.ErrorMsg(err.Error())); err != nil {
-					return err
-				}
-				return err
-				// templ.Handler(web.ErrorMsg(err.Error())).ServeHTTP(c.Response(), c.Request())
-			}
-			// templ.Handler(web.Rooms(rooms)).ServeHTTP(c.Response(), c.Request())
-			err = web.Render(c, http.StatusOK, web.Rooms(rooms))
-			return err
+		d.GET("/room-edit/:id", s.getEditRoomForm)
+		d.GET("/room-row/:id", s.getRoomRow)
+
+		roomManager := ws.NewRoomManager()
+
+		// NOTE: Room chat UI
+		d.GET("/:id", func(c echo.Context) error {
+			roomID := c.Param("id")
+			roomManager.GetRoom(roomID)
+
+			return s.getChatRoomHanlder(c)
 		})
 
-		d.POST("/api/room", func(c echo.Context) error {
-			room, err := s.createRoom(c)
-			if err != nil {
-				c.Response().Header().Set("HX-Retarget", "#create-room-error-container")
-				// templ.Handler(web.ErrorMsg(err.Error())).ServeHTTP(c.Response(), c.Request())
-				if err := web.Render(c, http.StatusBadRequest, web.ErrorMsg(err.Error())); err != nil {
-					log.Println("Error create room", err)
-				}
-				return nil
-			}
-			// templ.Handler(web.Room(&room)).ServeHTTP(c.Response(), c.Request())
-			return web.Render(c, http.StatusOK, web.Room(&room))
-		})
+		d.GET("/api/room", s.getAllRoomHandler)
 
-		d.DELETE("/api/room", func(c echo.Context) error {
-			id := c.QueryParam("id")
-			return s.deleteRoom(c, id)
-		})
+		d.POST("/api/room", s.createRoomHandler)
 
-		hub := ws.NewHub()
-		go hub.Run(context.Background())
-		d.GET("/chatroom", func(c echo.Context) error {
-			user := c.Get("user").(*jwt.Token)
-			claims := user.Claims.(jwt.MapClaims)
-			return ws.ServeWs(hub, c.Response(), c.Request(), claims)
+		d.PATCH("/api/room/:id", s.editRoomHandler)
+
+		d.DELETE("/api/room", s.deleteRoomHandler)
+
+		d.GET("/chatroom/:id", func(c echo.Context) error {
+			roomID := c.Param("id")
+			room := roomManager.GetRoom(roomID)
+			return ws.ServeWs(room, c)
 		})
 	}
 

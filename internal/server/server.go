@@ -11,12 +11,15 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 
 	"rplatform-echo/internal/database"
+	"rplatform-echo/internal/repository"
+	"rplatform-echo/internal/services"
 )
 
 type Server struct {
 	port int
 
-	db database.Service
+	db    database.Service
+	rooms *services.RoomService
 }
 
 func NewServer() *http.Server {
@@ -28,10 +31,14 @@ func NewServer() *http.Server {
 		log.Fatalf("Failed to initialize database schema: %v", err)
 	}
 
-	NewServer := &Server{
-		port: port,
+	// Wire repository and services
+	repo := repository.New(db.GetDB())
+	roomSvc := services.NewRoomService(repo)
 
-		db: db,
+	NewServer := &Server{
+		port:  port,
+		db:    db,
+		rooms: roomSvc,
 	}
 
 	// Declare Server config

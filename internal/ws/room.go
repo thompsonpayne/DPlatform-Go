@@ -4,15 +4,15 @@ import (
 	"context"
 )
 
-type Hub struct {
+type Room struct {
 	clients    map[*Client]bool
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
 }
 
-func NewHub() *Hub {
-	return &Hub{
+func NewHub() *Room {
+	return &Room{
 		clients:    make(map[*Client]bool),
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
@@ -20,7 +20,7 @@ func NewHub() *Hub {
 	}
 }
 
-func (h *Hub) Run(ctx context.Context) {
+func (h *Room) Run(ctx context.Context) {
 	for {
 		select {
 		case c := <-h.register:

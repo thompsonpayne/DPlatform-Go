@@ -1,0 +1,51 @@
+package web
+
+import "rplatform-echo/internal/repository"
+import "rplatform-echo/cmd/web/components/input"
+import "rplatform-echo/cmd/web/components/button"
+
+templ ChatRoom(room *repository.Room, userID string) {
+	@Base() {
+		<style>
+			.htmx-added {
+				transform: translateY(40px);
+			}
+		</style>
+		<div class="text-xl font-bold py-4 text-center">Room { room.Name }</div>
+		<div hx-ext="ws" ws-connect={ "/dashboard/chatroom/" + room.ID }>
+			<div id="notifications"></div>
+			<ul class="text-slate-900 space-y-1" id="chat_room" data-user-id={ userID }></ul>
+			<form
+				id="form"
+				ws-send
+				class="flex gap-2 my-4"
+				hx-on::ws-after-send="this.reset()"
+			>
+				@input.Input(input.Props{Name: "chat_message", Placeholder: "Type message..."})
+				@button.Button(button.Props{Type: button.TypeSubmit}) {
+					Send
+				}
+			</form>
+		</div>
+	}
+}
+
+templ ChatMessage(email string, message string, userID string, senderID string) {
+	<div id="chat_room" hx-swap-oob="beforeend">
+		<li
+			data-user-id={ userID }
+			class={ "bg-pink-200 text-left rounded-md px-4 py-2 w-fit transition-transform duration-300", templ.KV("bg-cyan-200! text-right! ml-auto", senderID == userID) }
+		>
+			<p>
+				<strong>
+					if senderID != userID {
+						{ email }:
+					} else {
+						You:
+					}
+				</strong>
+				{ message }
+			</p>
+		</li>
+	</div>
+}

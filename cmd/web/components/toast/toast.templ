@@ -60,6 +60,12 @@ templ Toast(props ...Props) {
 	if p.Duration == 0 {
 		{{ p.Duration = 3000 }}
 	}
+	if !p.Dismissible {
+		{{ p.Dismissible = true }}
+	}
+	if !p.ShowIndicator {
+		{{ p.ShowIndicator = true }}
+	}
 	<div
 		id={ p.ID }
 		data-tui-toast
@@ -159,5 +165,5 @@ templ Toast(props ...Props) {
 }
 
 templ Script() {
-	<script defer nonce={ templ.GetNonce(ctx) } src={ "assets/js/toast.min.js?v=" + utils.ScriptVersion }></script>
+	<script defer nonce={ templ.GetNonce(ctx) } src={ "/assets/js/toast.min.js?v=" + utils.ScriptVersion }></script>
 }

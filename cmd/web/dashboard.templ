@@ -1,6 +1,5 @@
 package web
 
-import "rplatform-echo/internal/repository"
 import "rplatform-echo/cmd/web/components/input"
 import "rplatform-echo/cmd/web/components/button"
 
@@ -20,19 +19,18 @@ templ DashBoard() {
 				hx-on::after-request="if(event.detail.successful) this.reset()"
 				hx-post="dashboard/api/room"
 				hx-target="#rooms"
-				hx-swap="afterbegin"
+				hx-swap="afterbegin settle"
 			>
 				<div class="flex gap-2">
-					@input.Input(input.Props{Type: input.TypeText, Placeholder: "Room name to create", Name: "name"})
+					@input.Input(input.Props{Type: input.TypeText, Placeholder: "Room name to create", Name: "name", Required: true})
 					@button.Button(button.Props{Type: button.TypeSubmit}) {
 						Create
 					}
 				</div>
 				<!-- <input type="text" name="name" class="border-slate-300 border-1" id="room-name"/> -->
 				<!-- <button type="submit">Create room</button> -->
-				<div id="create-room-error-container" hx-swap-oob="true"></div>
 			</form>
-			<div id="rooms" hx-get="dashboard/api/room" hx-target="#rooms" hx-swap="innerHTML" hx-trigger="load"></div>
+			<div id="rooms" hx-get="dashboard/api/room" hx-target="#rooms" hx-swap="outerHTML" hx-trigger="load" class="pt-4"></div>
 		</div>
 		<!-- <div hx-ext="ws" ws-connect="/dashboard/chatroom"> -->
 		<!-- 	Chat room here -->
@@ -44,39 +42,4 @@ templ DashBoard() {
 		<!-- 	</form> -->
 		<!-- </div> -->
 	}
-}
-
-templ ChatMessage(email string, message string) {
-	<div id="chat_room" hx-swap-oob="beforeend">
-		<!-- <div class={ templ.KV("bg-green-700", !isMsgOwner),templ.KV("bg-blue-600!", isMsgOwner) }> -->
-		<div>
-			<p><strong>{ email }:</strong> { message }</p>
-		</div>
-	</div>
-}
-
-templ Room(room *repository.Room) {
-	<div id="create-room-error-container" hx-swap-oob="true"></div>
-	<div id={ "room-" + room.ID } class="w-full bg-cyan-200 text-slate-900 flex justify-between">
-		<span>{ room.Name }</span>
-		<span>{ room.CreatedAt.Time.Format("2006-01-02 15:04") }</span>
-		<form hx-delete="dashboard/api/room" hx-confirm="Are you sure?" hx-target={ "#room-" + room.ID } hx-swap="outerHTML">
-			<input type="text" name="id" class="hidden" value={ room.ID }/>
-			@button.Button(button.Props{
-				Type:    button.TypeSubmit,
-				Variant: button.VariantDestructive,
-			}) {
-				Delete
-			}
-		</form>
-	</div>
-	<!-- <div id="toast"></div> -->
-}
-
-templ Rooms(rooms []repository.Room) {
-	<ul>
-		for _, room := range rooms {
-			@Room(&room)
-		}
-	</ul>
 }

@@ -1,0 +1,77 @@
+package web
+
+import "rplatform-echo/internal/repository"
+import "rplatform-echo/cmd/web/components/button"
+import "rplatform-echo/cmd/web/components/toast"
+import "rplatform-echo/cmd/web/components/input"
+
+templ Room(room *repository.Room) {
+	<div id={ "room-" + room.ID } class="w-full bg-inherit opacity-100 transition-all duration-300 ease-in  text-slate-900 flex items-center justify-between px-2 py-1">
+		@button.Button(button.Props{
+			Variant:    button.VariantLink,
+			Attributes: templ.Attributes{"hx-get": "dashboard/" + room.ID, "hx-target": "#rooms", "hx-swap": "outerHTML swap:300ms"},
+		}) {
+			{ room.Name }
+		}
+		<span>{ room.CreatedAt.Time.Format("2006-01-02 15:04") }</span>
+		<div class="flex gap-2 ">
+			<form hx-get={ "dashboard/room-edit/" + room.ID + "?name=" + room.Name } hx-target={ "#room-" + room.ID } hx-swap="outerHTML swap:300ms">
+				@button.Button(button.Props{
+					Type:    button.TypeSubmit,
+					Variant: button.VariantSecondary,
+				}) {
+					Edit
+				}
+			</form>
+			<form hx-delete="dashboard/api/room" hx-confirm="Are you sure?" hx-target={ "#room-" + room.ID } hx-swap="outerHTML swap:300ms">
+				<input type="text" name="id" class="hidden" value={ room.ID }/>
+				@button.Button(button.Props{
+					Type:    button.TypeSubmit,
+					Variant: button.VariantDestructive,
+				}) {
+					Delete
+				}
+			</form>
+		</div>
+	</div>
+	<!-- <div id="toast"></div> -->
+}
+
+templ Rooms(rooms []repository.Room) {
+	<ul id="rooms" class="rounded-md border bg-blue-300 border-cyan-700">
+		for _, room := range rooms {
+			@Room(&room)
+		}
+	</ul>
+	<style>
+		.htmx-added {
+			opacity: 0;
+			transform: translateX(-30px);
+		}
+		.htmx-swapping {
+			opacity: 0;
+			transition: opacity 300ms ease-out;
+		}
+	</style>
+}
+
+templ RoomCreateResponse(room *repository.Room) {
+	@toast.Toast(toast.Props{
+		Title:       "Room",
+		Description: "Created",
+		Variant:     toast.VariantSuccess,
+	})
+	@Room(room)
+}
+
+templ RoomEditForm(id string, name string) {
+	<form hx-patch={ "/dashboard/api/room/" + id } target={ "room-" + id } hx-swap="outerHTML" class="flex w-full px-2 py-1 transition-transform">
+		@input.Input(input.Props{Type: input.TypeText, Name: "name", Value: name, Attributes: templ.Attributes{"autofocus": true}})
+		@button.Button(button.Props{Type: button.TypeSubmit}) {
+			Save
+		}
+		@button.Button(button.Props{Type: button.TypeButton, Variant: button.VariantGhost, Attributes: templ.Attributes{"hx-get": "/dashboard/room-row/" + id, "hx-target": "closest form", "hx-swap": "outerHTML"}}) {
+			Cancel
+		}
+	</form>
+}

@@ -2,7 +2,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,8 +12,8 @@ import (
 	"rplatform-echo/cmd/web/components/toast"
 	"rplatform-echo/internal/repository"
 
-	"github.com/a-h/templ"
 	"github.com/coder/websocket"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -162,54 +161,149 @@ func (s *Server) logOutHandler(c echo.Context) error {
 	return c.String(http.StatusFound, "OK")
 }
 
-func (s *Server) createRoom(c echo.Context) (repository.Room, error) {
+// NOTE: create room here
+func (s *Server) createRoomHandler(c echo.Context) error {
 	name := c.FormValue("name")
 	if utf8.RuneCountInString(name) == 0 {
-		return repository.Room{}, errors.New("can't be empty")
-	}
-	room := repository.CreateRoomParams{
-		ID:   uuid.New().String(),
-		Name: name,
-	}
-
-	rawDB := s.db.GetDB()
-	queries := repository.New(rawDB)
-
-	// Save the user to the database
-	createdRoom, err := queries.CreateRoom(c.Request().Context(), room)
-	return createdRoom, err
-}
-
-func (s *Server) deleteRoom(c echo.Context, id string) error {
-	rawDB := s.db.GetDB()
-	queries := repository.New(rawDB)
-
-	// Save the user to the database
-	err := queries.DeleteRoom(c.Request().Context(), id)
-	if err != nil {
-		c.Response().WriteHeader(http.StatusNotFound)
-		toast.Toast(toast.Props{
-			Title:       "Delete",
-			Description: err.Error(),
+		c.Response().WriteHeader(http.StatusBadRequest)
+		if err := toast.Toast(toast.Props{
+			Title:       "Room",
+			Description: "Can't be empty",
 			Variant:     toast.VariantError,
-			Attributes:  templ.Attributes{"hx-swap-oob": "true"},
-		}).Render(c.Request().Context(), c.Response())
+		}).Render(c.Request().Context(), c.Response()); err != nil {
+			return err
+		}
 		return nil
 	}
 
-	toast.Toast(toast.Props{
+	createdRoom, err := s.rooms.Create(c.Request().Context(), name)
+	if err != nil {
+		c.Response().WriteHeader(http.StatusNotFound)
+		if err := toast.Toast(toast.Props{
+			Title:       "Room",
+			Description: err.Error(),
+			Variant:     toast.VariantError,
+		}).Render(c.Request().Context(), c.Response()); err != nil {
+			return err
+		}
+		return nil
+	}
+	return web.Render(c, http.StatusOK, web.RoomCreateResponse(&createdRoom))
+}
+
+func (s *Server) deleteRoomHandler(c echo.Context) error {
+	id := c.QueryParam("id")
+	if err := s.rooms.Delete(c.Request().Context(), id); err != nil {
+		c.Response().WriteHeader(http.StatusNotFound)
+		if err := toast.Toast(toast.Props{
+			Title:       "Delete",
+			Description: err.Error(),
+			Variant:     toast.VariantError,
+		}).Render(c.Request().Context(), c.Response()); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return toast.Toast(toast.Props{
 		Title:         "Delete",
 		Description:   "Success",
 		ShowIndicator: true,
 		Dismissible:   true,
 		Variant:       toast.VariantSuccess,
 	}).Render(c.Request().Context(), c.Response())
+}
+
+func (s *Server) editRoomHandler(c echo.Context) error {
+	id := c.Param("id")
+	name := c.FormValue("name")
+	err := s.rooms.Update(c.Request().Context(), id, name)
+	if err != nil {
+		return toast.Toast(toast.Props{
+			Title:       "Room",
+			Description: err.Error(),
+			Variant:     toast.VariantError,
+		}).Render(c.Request().Context(), c.Response())
+	}
+	if err := toast.Toast(toast.Props{
+		Title:       "Room",
+		Description: "Success",
+		Variant:     toast.VariantSuccess,
+	}).Render(c.Request().Context(), c.Response()); err != nil {
+		return err
+	}
+	return s.getRoomRow(c)
+}
+
+func (s *Server) getAllRoomHandler(c echo.Context) error {
+	rooms, err := s.rooms.List(c.Request().Context())
+	if err != nil {
+		if err := web.Render(c, http.StatusInternalServerError, web.ErrorMsg(err.Error())); err != nil {
+			return err
+		}
+		return err
+	}
+	return web.Render(c, http.StatusOK, web.Rooms(rooms))
+}
+
+func (s *Server) getChatRoomHanlder(c echo.Context) error {
+	id := c.Param("id")
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+	room, err := s.rooms.Get(c.Request().Context(), id)
+	if err != nil {
+		c.Response().WriteHeader(http.StatusNotFound)
+		return toast.Toast(toast.Props{
+			Title:       "Room",
+			Description: err.Error(),
+			Variant:     toast.VariantError,
+		}).Render(c.Request().Context(), c.Response())
+	}
+	c.Response().Header().Set("HX-Redirect", "/dashboard/"+room.ID)
+
+	if err := web.Render(c, http.StatusOK, web.ChatRoom(&room, userID)); err != nil {
+		c.Response().WriteHeader(http.StatusInternalServerError)
+		return toast.Toast(toast.Props{
+			Title:       "Room",
+			Description: err.Error(),
+			Variant:     toast.VariantError,
+		}).Render(c.Request().Context(), c.Response())
+	}
 	return nil
 }
 
-func (s *Server) getAllRoom(c echo.Context) ([]repository.Room, error) {
-	rawDB := s.db.GetDB()
-	queries := repository.New(rawDB)
-	rooms, err := queries.GetAllRooms(c.Request().Context())
-	return rooms, err
+func (s *Server) authHandler(c echo.Context) error {
+	cookie, err := c.Cookie("jwt_token")
+	if err != nil {
+		// cookie not found, render auth page
+		return web.Render(c, http.StatusOK, web.Auth())
+	}
+	if cookie.Value != "" {
+		// NOTE: if there's a jwt token in the cookie then redirect page
+		if err := c.Redirect(http.StatusFound, "/dashboard"); err != nil {
+			return err
+		}
+	}
+	return web.Render(c, http.StatusOK, web.Auth())
+}
+
+func (s *Server) getEditRoomForm(c echo.Context) error {
+	id := c.Param("id")
+	name := c.QueryParam("name")
+	return web.Render(c, http.StatusOK, web.RoomEditForm(id, name))
+}
+
+func (s *Server) getRoomRow(c echo.Context) error {
+	id := c.Param("id")
+	room, err := s.rooms.Get(c.Request().Context(), id)
+	if err != nil {
+		return toast.Toast(toast.Props{
+			Title:       "Room",
+			Description: err.Error(),
+			Variant:     toast.VariantError,
+		}).Render(c.Request().Context(), c.Response())
+	}
+
+	return web.Render(c, http.StatusOK, web.Room(&room))
 }

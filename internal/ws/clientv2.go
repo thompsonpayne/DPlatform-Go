@@ -6,13 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"net/http"
 	"time"
 
 	"rplatform-echo/cmd/web"
 
 	"github.com/coder/websocket"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v4"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 type Client struct {
 	conn *websocket.Conn
 	send chan []byte
-	hub  *Hub
+	hub  *Room
 
 	userID string
 	email  string
@@ -48,7 +48,20 @@ func (c *Client) readPump() {
 			log.Printf("Error reading ws %v", err)
 			return
 		}
-		c.hub.broadcast <- msg
+		var msgMap map[string]any
+		if err := json.Unmarshal(msg, &msgMap); err != nil {
+			// send normal message if decode errors
+			c.hub.broadcast <- msg
+		} else {
+			msgMap["sender_id"] = c.userID
+			msgMap["email"] = c.email
+			msgToSend, err := json.Marshal(msgMap)
+			if err != nil {
+				c.hub.broadcast <- msg
+			} else {
+				c.hub.broadcast <- msgToSend
+			}
+		}
 	}
 }
 
@@ -73,11 +86,11 @@ func (c *Client) writePump() {
 			if err := json.Unmarshal(msg, &msgToSend); err != nil {
 				log.Println("Error decoding", err)
 			}
-			msgToSend["userID"] = c.userID
-			msgToSend["email"] = c.email
+			// msgToSend["userID"] = c.userID
+			// msgToSend["email"] = c.email
 			// encodedMsg, err := json.Marshal(msgToSend)
 			var buf bytes.Buffer
-			err := web.ChatMessage(c.email, msgToSend["chat_message"].(string)).Render(context.Background(), &buf)
+			err := web.ChatMessage(msgToSend["email"].(string), msgToSend["chat_message"].(string), c.userID, msgToSend["sender_id"].(string)).Render(context.Background(), &buf)
 			if err != nil {
 				log.Println("Error encoding", err)
 			}
@@ -97,17 +110,21 @@ func writeWithTimeout(ctx context.Context, timeout time.Duration, conn *websocke
 	return conn.Write(ctx, typ, msg)
 }
 
-func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request, claims jwt.MapClaims) error {
-	c, err := websocket.Accept(w, r, nil)
+func ServeWs(hub *Room, c echo.Context) error {
+	w := c.Response().Writer
+	r := c.Request()
+	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return err
 	}
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
 	userID := claims["user_id"].(string)
 	email := claims["email"].(string)
 
 	client := &Client{
 		hub:    hub,
-		conn:   c,
+		conn:   conn,
 		send:   make(chan []byte, subscriberBufferSize),
 		userID: userID,
 		email:  email,

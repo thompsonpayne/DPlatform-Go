@@ -5,16 +5,22 @@ import (
 	"errors"
 	"log"
 	"sync"
+
+	"rplatform-echo/internal/services"
 )
 
 type RoomManager struct {
 	rooms map[string]*Room
 	mu    sync.RWMutex
+
+	messageSvc *services.MessageService
 }
 
-func NewRoomManager() *RoomManager {
+func NewRoomManager(messageSvc *services.MessageService) *RoomManager {
 	return &RoomManager{
 		rooms: make(map[string]*Room),
+
+		messageSvc: messageSvc,
 	}
 }
 
@@ -33,7 +39,7 @@ func (m *RoomManager) GetRoom(roomID string) *Room {
 		return room
 	}
 
-	room = NewHub()
+	room = NewRoom(roomID, m)
 	m.rooms[roomID] = room
 	log.Println("New chat room created: ", roomID)
 

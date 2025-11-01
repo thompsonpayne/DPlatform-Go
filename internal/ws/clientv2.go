@@ -55,11 +55,20 @@ func (c *Client) readPump() {
 		} else {
 			msgMap["sender_id"] = c.userID
 			msgMap["email"] = c.email
+			_msgContent, ok := msgMap["chat_message"].(string)
+			var msgContent string
+			if ok {
+				msgContent = _msgContent
+			}
 			msgToSend, err := json.Marshal(msgMap)
 			if err != nil {
 				c.hub.broadcast <- msg
 			} else {
 				c.hub.broadcast <- msgToSend
+			}
+			// insert data to db here
+			if _, err := c.hub.manager.messageSvc.Create(ctx, c.hub.id, c.userID, msgContent); err != nil {
+				log.Println(err.Error())
 			}
 		}
 	}
@@ -86,9 +95,6 @@ func (c *Client) writePump() {
 			if err := json.Unmarshal(msg, &msgToSend); err != nil {
 				log.Println("Error decoding", err)
 			}
-			// msgToSend["userID"] = c.userID
-			// msgToSend["email"] = c.email
-			// encodedMsg, err := json.Marshal(msgToSend)
 			var buf bytes.Buffer
 			err := web.ChatMessage(msgToSend["email"].(string), msgToSend["chat_message"].(string), c.userID, msgToSend["sender_id"].(string)).Render(context.Background(), &buf)
 			if err != nil {

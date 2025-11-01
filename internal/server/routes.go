@@ -61,11 +61,14 @@ func (s *Server) RegisterRoutes() http.Handler {
 		d.GET("/room-edit/:id", s.getEditRoomForm)
 		d.GET("/room-row/:id", s.getRoomRow)
 
-		roomManager := ws.NewRoomManager()
+		roomManager := ws.NewRoomManager(s.messageSvc)
 
 		// NOTE: Room chat UI
 		d.GET("/:id", func(c echo.Context) error {
 			roomID := c.Param("id")
+
+			// If room doesn't exits, init a room, create a running ws
+			// The newly created room will be valid to access for ws in /chatroom/:id
 			roomManager.GetRoom(roomID)
 
 			return s.getChatRoomHanlder(c)

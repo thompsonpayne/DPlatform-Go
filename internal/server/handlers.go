@@ -176,7 +176,7 @@ func (s *Server) createRoomHandler(c echo.Context) error {
 		return nil
 	}
 
-	createdRoom, err := s.rooms.Create(c.Request().Context(), name)
+	createdRoom, err := s.roomSvc.Create(c.Request().Context(), name)
 	if err != nil {
 		c.Response().WriteHeader(http.StatusNotFound)
 		if err := toast.Toast(toast.Props{
@@ -193,7 +193,7 @@ func (s *Server) createRoomHandler(c echo.Context) error {
 
 func (s *Server) deleteRoomHandler(c echo.Context) error {
 	id := c.QueryParam("id")
-	if err := s.rooms.Delete(c.Request().Context(), id); err != nil {
+	if err := s.roomSvc.Delete(c.Request().Context(), id); err != nil {
 		c.Response().WriteHeader(http.StatusNotFound)
 		if err := toast.Toast(toast.Props{
 			Title:       "Delete",
@@ -217,7 +217,7 @@ func (s *Server) deleteRoomHandler(c echo.Context) error {
 func (s *Server) editRoomHandler(c echo.Context) error {
 	id := c.Param("id")
 	name := c.FormValue("name")
-	err := s.rooms.Update(c.Request().Context(), id, name)
+	err := s.roomSvc.Update(c.Request().Context(), id, name)
 	if err != nil {
 		return toast.Toast(toast.Props{
 			Title:       "Room",
@@ -236,7 +236,7 @@ func (s *Server) editRoomHandler(c echo.Context) error {
 }
 
 func (s *Server) getAllRoomHandler(c echo.Context) error {
-	rooms, err := s.rooms.List(c.Request().Context())
+	rooms, err := s.roomSvc.List(c.Request().Context())
 	if err != nil {
 		if err := web.Render(c, http.StatusInternalServerError, web.ErrorMsg(err.Error())); err != nil {
 			return err
@@ -251,18 +251,26 @@ func (s *Server) getChatRoomHanlder(c echo.Context) error {
 	user := c.Get("user").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
 	userID := claims["user_id"].(string)
-	room, err := s.rooms.Get(c.Request().Context(), id)
+	room, err := s.roomSvc.Get(c.Request().Context(), id)
 	if err != nil {
-		c.Response().WriteHeader(http.StatusNotFound)
 		return toast.Toast(toast.Props{
 			Title:       "Room",
 			Description: err.Error(),
 			Variant:     toast.VariantError,
 		}).Render(c.Request().Context(), c.Response())
 	}
-	c.Response().Header().Set("HX-Redirect", "/dashboard/"+room.ID)
+	msgs, err := s.messageSvc.List(c.Request().Context(), id)
+	if err != nil {
+		c.Response().WriteHeader(http.StatusInternalServerError)
+		return toast.Toast(toast.Props{
+			Title:       "Room",
+			Description: err.Error(),
+			Variant:     toast.VariantError,
+		}).Render(c.Request().Context(), c.Response())
+	}
+	c.Response().Header().Set("HX-Redirect", "/dashboard/"+id)
 
-	if err := web.Render(c, http.StatusOK, web.ChatRoom(&room, userID)); err != nil {
+	if err := web.Render(c, http.StatusOK, web.ChatRoom(&room, userID, &msgs)); err != nil {
 		c.Response().WriteHeader(http.StatusInternalServerError)
 		return toast.Toast(toast.Props{
 			Title:       "Room",
@@ -296,7 +304,7 @@ func (s *Server) getEditRoomForm(c echo.Context) error {
 
 func (s *Server) getRoomRow(c echo.Context) error {
 	id := c.Param("id")
-	room, err := s.rooms.Get(c.Request().Context(), id)
+	room, err := s.roomSvc.Get(c.Request().Context(), id)
 	if err != nil {
 		return toast.Toast(toast.Props{
 			Title:       "Room",

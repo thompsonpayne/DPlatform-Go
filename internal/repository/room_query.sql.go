@@ -41,7 +41,7 @@ func (q *Queries) DeleteRoom(ctx context.Context, id string) error {
 
 const getAllRooms = `-- name: GetAllRooms :many
 SELECT id, name, created_at FROM rooms
-ORDER BY created_at DESC
+ORDER BY created_at
 `
 
 func (q *Queries) GetAllRooms(ctx context.Context) ([]Room, error) {

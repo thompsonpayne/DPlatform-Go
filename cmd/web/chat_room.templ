@@ -4,7 +4,7 @@ import "rplatform-echo/internal/repository"
 import "rplatform-echo/cmd/web/components/input"
 import "rplatform-echo/cmd/web/components/button"
 
-templ ChatRoom(room *repository.Room, userID string) {
+templ ChatRoom(room *repository.Room, userID string, msgs *[]repository.GetAllMessagesRow) {
 	@Base() {
 		<style>
 			.htmx-added {
@@ -14,7 +14,25 @@ templ ChatRoom(room *repository.Room, userID string) {
 		<div class="text-xl font-bold py-4 text-center">Room { room.Name }</div>
 		<div hx-ext="ws" ws-connect={ "/dashboard/chatroom/" + room.ID }>
 			<div id="notifications"></div>
-			<ul class="text-slate-900 space-y-1" id="chat_room" data-user-id={ userID }></ul>
+			<ul class="text-slate-900 space-y-1" id="chat_room" data-user-id={ userID }>
+				for _, msg := range *msgs {
+					<li
+						data-user-id={ userID }
+						class={ "bg-pink-200 text-left rounded-md px-4 py-2 w-fit transition-transform duration-300", templ.KV("bg-cyan-200! text-right! ml-auto", msg.UserID == userID) }
+					>
+						<p>
+							<strong>
+								if msg.UserID != userID {
+									{ msg.UserEmail }:
+								} else {
+									You:
+								}
+							</strong>
+							{ msg.Content }
+						</p>
+					</li>
+				}
+			</ul>
 			<form
 				id="form"
 				ws-send

@@ -5,18 +5,24 @@ import (
 )
 
 type Room struct {
+	id         string
 	clients    map[*Client]bool
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
+
+	manager *RoomManager
 }
 
-func NewHub() *Room {
+func NewRoom(id string, manager *RoomManager) *Room {
 	return &Room{
+		id:         id,
 		clients:    make(map[*Client]bool),
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+
+		manager: manager,
 	}
 }
 

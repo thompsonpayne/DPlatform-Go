@@ -18,8 +18,9 @@ import (
 type Server struct {
 	port int
 
-	db    database.Service
-	rooms *services.RoomService
+	db         database.Service
+	roomSvc    *services.RoomService
+	messageSvc *services.MessageService
 }
 
 func NewServer() *http.Server {
@@ -34,11 +35,13 @@ func NewServer() *http.Server {
 	// Wire repository and services
 	repo := repository.New(db.GetDB())
 	roomSvc := services.NewRoomService(repo)
+	messageSvc := services.NewMessageService(repo)
 
 	NewServer := &Server{
-		port:  port,
-		db:    db,
-		rooms: roomSvc,
+		port:       port,
+		db:         db,
+		roomSvc:    roomSvc,
+		messageSvc: messageSvc,
 	}
 
 	// Declare Server config

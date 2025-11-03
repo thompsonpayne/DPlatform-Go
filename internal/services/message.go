@@ -2,11 +2,12 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"rplatform-echo/internal/repository"
 
-	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 )
 
 type MessageService struct {
@@ -19,8 +20,15 @@ func NewMessageService(q *repository.Queries) *MessageService {
 	}
 }
 
-func (m *MessageService) List(ctx context.Context, roomID string) ([]repository.GetAllMessagesRow, error) {
-	return m.q.GetAllMessages(ctx, roomID)
+func (m *MessageService) ListFirst(ctx context.Context, roomID string) ([]repository.GetInitalMessagesRow, error) {
+	return m.q.GetInitalMessages(ctx, roomID)
+}
+
+func (m *MessageService) ListNext(ctx context.Context, roomID string, createdAt sql.NullTime) ([]repository.GetPaginatedMessagesRow, error) {
+	return m.q.GetPaginatedMessages(ctx, repository.GetPaginatedMessagesParams{
+		RoomID:   roomID,
+		Datetime: createdAt,
+	})
 }
 
 func (m *MessageService) Create(ctx context.Context, roomID string, userID string, content string) (repository.Message, error) {
@@ -32,7 +40,7 @@ func (m *MessageService) Create(ctx context.Context, roomID string, userID strin
 	return m.q.CreateMessage(ctx, repository.CreateMessageParams{
 		RoomID:  roomID,
 		UserID:  userID,
-		ID:      uuid.NewString(),
+		ID:      ulid.Make().String(),
 		Content: content,
 	})
 }

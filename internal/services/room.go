@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
-
 	"rplatform-echo/internal/repository"
+
+	"github.com/oklog/ulid/v2"
 )
 
 // RoomService encapsulates room-related business logic.
@@ -27,7 +27,7 @@ func (s *RoomService) Create(ctx context.Context, name string) (repository.Room,
 	if name == "" {
 		return repository.Room{}, errors.New("name is required")
 	}
-	params := repository.CreateRoomParams{ID: uuid.New().String(), Name: name}
+	params := repository.CreateRoomParams{ID: ulid.Make().String(), Name: name}
 	return s.q.CreateRoom(ctx, params)
 }
 

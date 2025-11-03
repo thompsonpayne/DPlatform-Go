@@ -16,7 +16,12 @@ import (
 
 func (s *Server) RegisterRoutes() http.Handler {
 	e := echo.New()
-	e.Use(middleware.Logger())
+	// e.Use(middleware.Logger())
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format: `ℹ️💻 time=${time_rfc3339} 🧩🧩 method=${method} 🧩🧩 uri=${uri} 🧩🧩 status=${status} 🧩🧩 latency=${latency_human}` + "\n",
+		// optionally specify output (defaults to stdout)
+		// Output: myWriter,
+	}))
 	e.Use(middleware.Recover())
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -74,6 +79,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 			return s.getChatRoomHanlder(c)
 		})
 
+		d.GET("/room/:roomID/messages", s.getMoreMessagesHandler)
 		d.GET("/api/room", s.getAllRoomHandler)
 
 		d.POST("/api/room", s.createRoomHandler)

@@ -52,21 +52,28 @@ func (q *Queries) DeleteMessage(ctx context.Context, id string) error {
 	return err
 }
 
-const getAllMessages = `-- name: GetAllMessages :many
-select
-    messages.id as message_id,
-    messages.content, messages.created_at,
-    users.id as user_id, users.name as user_name, users.email as user_email,
-    rooms.id as room_id,
-    rooms.name as room_name
-from messages
-join users on messages.user_id = users.id
-join rooms on messages.room_id = rooms.id
-where room_id = ?
-order by messages.created_at
+const getInitalMessages = `-- name: GetInitalMessages :many
+select message_id, content, created_at, user_id, user_name, user_email, room_id, room_name from
+    (
+        select
+            messages.id as message_id,
+            messages.content, messages.created_at,
+            users.id as user_id,
+            users.name as user_name,
+            users.email as user_email,
+            rooms.id as room_id,
+            rooms.name as room_name
+        from messages
+        join users on messages.user_id = users.id
+        join rooms on messages.room_id = rooms.id
+        where room_id = ?
+        order by messages.created_at desc
+        limit 10)
+        sub
+order by sub.created_at asc
 `
 
-type GetAllMessagesRow struct {
+type GetInitalMessagesRow struct {
 	MessageID string
 	Content   string
 	CreatedAt sql.NullTime
@@ -77,15 +84,80 @@ type GetAllMessagesRow struct {
 	RoomName  string
 }
 
-func (q *Queries) GetAllMessages(ctx context.Context, roomID string) ([]GetAllMessagesRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAllMessages, roomID)
+func (q *Queries) GetInitalMessages(ctx context.Context, roomID string) ([]GetInitalMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getInitalMessages, roomID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetAllMessagesRow
+	var items []GetInitalMessagesRow
 	for rows.Next() {
-		var i GetAllMessagesRow
+		var i GetInitalMessagesRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UserID,
+			&i.UserName,
+			&i.UserEmail,
+			&i.RoomID,
+			&i.RoomName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPaginatedMessages = `-- name: GetPaginatedMessages :many
+select message_id, content, created_at, user_id, user_name, user_email, room_id, room_name from
+    (select
+        messages.id as message_id,
+        messages.content, messages.created_at,
+        users.id as user_id, users.name as user_name, users.email as user_email,
+        rooms.id as room_id,
+        rooms.name as room_name
+    from messages
+    join users on messages.user_id = users.id
+    join rooms on messages.room_id = rooms.id
+    where room_id = ? and datetime (messages.created_at) < datetime (?)
+    order by messages.created_at desc
+    limit 10) sub
+order by sub.created_at asc
+`
+
+type GetPaginatedMessagesParams struct {
+	RoomID   string
+	Datetime interface{}
+}
+
+type GetPaginatedMessagesRow struct {
+	MessageID string
+	Content   string
+	CreatedAt sql.NullTime
+	UserID    string
+	UserName  string
+	UserEmail string
+	RoomID    string
+	RoomName  string
+}
+
+func (q *Queries) GetPaginatedMessages(ctx context.Context, arg GetPaginatedMessagesParams) ([]GetPaginatedMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getPaginatedMessages, arg.RoomID, arg.Datetime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPaginatedMessagesRow
+	for rows.Next() {
+		var i GetPaginatedMessagesRow
 		if err := rows.Scan(
 			&i.MessageID,
 			&i.Content,

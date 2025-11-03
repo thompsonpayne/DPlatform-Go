@@ -2,9 +2,11 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -14,8 +16,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/oklog/ulid/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -80,7 +82,7 @@ func (s *Server) registerHanlder(c echo.Context) error {
 
 	// Create a new User object
 	user := repository.CreateUserParams{
-		ID:       uuid.New().String(),
+		ID:       ulid.Make().String(),
 		Name:     email,
 		Email:    email,
 		Password: string(hashedPassword),
@@ -251,6 +253,7 @@ func (s *Server) getChatRoomHanlder(c echo.Context) error {
 	user := c.Get("user").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
 	userID := claims["user_id"].(string)
+	email := claims["email"].(string)
 	room, err := s.roomSvc.Get(c.Request().Context(), id)
 	if err != nil {
 		return toast.Toast(toast.Props{
@@ -259,7 +262,8 @@ func (s *Server) getChatRoomHanlder(c echo.Context) error {
 			Variant:     toast.VariantError,
 		}).Render(c.Request().Context(), c.Response())
 	}
-	msgs, err := s.messageSvc.List(c.Request().Context(), id)
+	msgs, err := s.messageSvc.ListFirst(c.Request().Context(), id)
+	log.Println("List messages:", msgs)
 	if err != nil {
 		c.Response().WriteHeader(http.StatusInternalServerError)
 		return toast.Toast(toast.Props{
@@ -270,7 +274,7 @@ func (s *Server) getChatRoomHanlder(c echo.Context) error {
 	}
 	c.Response().Header().Set("HX-Redirect", "/dashboard/"+id)
 
-	if err := web.Render(c, http.StatusOK, web.ChatRoom(&room, userID, &msgs)); err != nil {
+	if err := web.Render(c, http.StatusOK, web.ChatRoom(&room, userID, email, msgs)); err != nil {
 		c.Response().WriteHeader(http.StatusInternalServerError)
 		return toast.Toast(toast.Props{
 			Title:       "Room",
@@ -279,6 +283,36 @@ func (s *Server) getChatRoomHanlder(c echo.Context) error {
 		}).Render(c.Request().Context(), c.Response())
 	}
 	return nil
+}
+
+func (s *Server) getMoreMessagesHandler(c echo.Context) error {
+	roomID := c.Param("roomID")
+	createdAt := c.QueryParam("createdAt")
+
+	ca, err := time.Parse(time.RFC3339, createdAt)
+	ca = ca.Truncate(time.Second)
+	log.Println("Time param query", ca)
+	if err != nil {
+		log.Println("error converting time", err)
+		return err
+	}
+	msgs, listErr := s.messageSvc.ListNext(c.Request().Context(), roomID, sql.NullTime{Time: ca, Valid: true})
+	log.Println("Messages:")
+	fmt.Printf("%-5s | %-30s | %-25s\n", "Index", "Content", "CreatedAt")
+	fmt.Println(strings.Repeat("-", 70))
+
+	for i, msg := range msgs {
+		fmt.Printf("%-5d | %-30s | %-25s\n", i, msg.Content, msg.CreatedAt.Time)
+	}
+	log.Println("=================")
+
+	if listErr != nil {
+		return listErr
+	}
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+	return web.Render(c, http.StatusOK, web.OlderMessages(msgs, userID))
 }
 
 func (s *Server) authHandler(c echo.Context) error {

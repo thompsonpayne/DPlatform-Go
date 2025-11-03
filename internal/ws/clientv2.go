@@ -85,17 +85,20 @@ func (c *Client) writePump() {
 		c.hub.unregister <- c
 	}()
 
+	var buf bytes.Buffer
+
 	for {
 		select {
 		case msg, ok := <-c.send:
 			if !ok {
 				return
 			}
+			buf.Reset()
+
 			var msgToSend map[string]any
 			if err := json.Unmarshal(msg, &msgToSend); err != nil {
 				log.Println("Error decoding", err)
 			}
-			var buf bytes.Buffer
 			err := web.ChatMessage(msgToSend["email"].(string), msgToSend["chat_message"].(string), c.userID, msgToSend["sender_id"].(string)).Render(context.Background(), &buf)
 			if err != nil {
 				log.Println("Error encoding", err)

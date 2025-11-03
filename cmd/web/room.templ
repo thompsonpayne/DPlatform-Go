@@ -4,6 +4,7 @@ import "rplatform-echo/internal/repository"
 import "rplatform-echo/cmd/web/components/button"
 import "rplatform-echo/cmd/web/components/toast"
 import "rplatform-echo/cmd/web/components/input"
+import "time"
 
 templ Room(room *repository.Room) {
 	<div id={ "room-" + room.ID } class="w-full bg-inherit opacity-100 transition-all duration-300 ease-in  text-slate-900 flex items-center justify-between px-2 py-1">
@@ -13,8 +14,8 @@ templ Room(room *repository.Room) {
 		}) {
 			{ room.Name }
 		}
-		<span>{ room.CreatedAt.Time.Format("2006-01-02 15:04") }</span>
-		<div class="flex gap-2 ">
+		<span>{ room.CreatedAt.Time.Format(time.RFC3339) }</span>
+		<div class="flex gap-2">
 			<form hx-get={ "dashboard/room-edit/" + room.ID + "?name=" + room.Name } hx-target={ "#room-" + room.ID } hx-swap="outerHTML swap:300ms">
 				@button.Button(button.Props{
 					Type:    button.TypeSubmit,

@@ -25,22 +25,22 @@ templ ChatRoom(room *repository.Room, userID string, email string, msgs []reposi
 				})
 				Loading...
 			</div>
-			<ul class="text-slate-900 space-y-1 max-h-[400px] overflow-y-auto flex flex-col-reverse px-2" id="chat_room" data-user-id={ userID }>
-				for _, msg := range msgs {
+			<ul class="text-slate-900 gap-1  max-h-[400px] overflow-y-auto flex flex-col-reverse px-2" id="chat_room" data-user-id={ userID }>
+				for ind, msg := range msgs {
 					<li
-						data-user-id={ userID }
-						class={ "bg-pink-200 text-left rounded-md px-4 py-2 w-fit transition-transform duration-300", templ.KV("bg-cyan-200! text-right! ml-auto", msg.UserID == userID) }
+						data-user-id={ msg.UserID }
+						class={ "text-left transition-transform duration-300", templ.KV("text-right! ml-auto", msg.UserID == userID) }
 					>
-						<p>
-							<strong>
+						if ind > 0 && msg.UserEmail != msgs[ind - 1].UserEmail {
+							<span class="text-slate-50">
 								if msg.UserID != userID {
-									{ msg.UserEmail }:
-								} else {
-									You:
+									{ msg.UserEmail }
 								}
-							</strong>
+							</span>
+						}
+						<div class={ "bg-pink-200  rounded-md px-4 py-2 w-fit", templ.KV("bg-cyan-200!", msg.UserID == userID) }>
 							{ msg.Content }
-						</p>
+						</div>
 					</li>
 				}
 				if len(msgs) >= utils.MessagesLimit {
@@ -50,7 +50,7 @@ templ ChatRoom(room *repository.Room, userID string, email string, msgs []reposi
 						hx-swap="beforeend"
 						hx-target="#chat_room"
 						hx-indicator="#indicator"
-					>Load older messages</li>
+					></li>
 				}
 			</ul>
 			<form
@@ -72,40 +72,38 @@ templ ChatRoom(room *repository.Room, userID string, email string, msgs []reposi
 templ ChatMessage(email string, message string, userID string, senderID string) {
 	<div id="chat_room" hx-swap-oob="afterbegin">
 		<li
-			data-user-id={ userID }
-			class={ "bg-pink-200 text-left rounded-md px-4 py-2 w-fit transition-transform duration-300", templ.KV("bg-cyan-200! text-right! ml-auto", senderID == userID) }
+			data-user-id={ senderID }
+			class={ "text-left transition-transform duration-300", templ.KV("text-right! ml-auto", senderID == userID) }
 		>
-			<p>
-				<strong>
-					if senderID != userID {
-						{ email }:
-					} else {
-						You:
-					}
-				</strong>
+			<span class="text-slate-50">
+				if senderID != userID {
+					{ email }
+				}
+			</span>
+			<div class={ "bg-pink-200  rounded-md px-4 py-2 w-fit", templ.KV("bg-cyan-200!", senderID == userID) }>
 				{ message }
-			</p>
+			</div>
 		</li>
 	</div>
 }
 
 // For lazy loading older chat messages
 templ OlderMessages(msgs []repository.GetPaginatedMessagesRow, userID string) {
-	for _, msg := range msgs {
+	for ind, msg := range msgs {
 		<li
 			data-user-id={ msg.UserID }
-			class={ "bg-pink-200 text-left rounded-md px-4 py-2 w-fit transition-transform duration-300", templ.KV("bg-cyan-200! text-right! ml-auto", msg.UserID == userID) }
+			class={ "text-left transition-transform duration-300", templ.KV("text-right! ml-auto", msg.UserID == userID) }
 		>
-			<p>
-				<strong>
+			if ind > 0 && msg.UserEmail != msgs[ind - 1].UserEmail {
+				<span class="text-slate-50">
 					if msg.UserID != userID {
-						{ msg.UserEmail }:
-					} else {
-						You:
+						{ msg.UserEmail }
 					}
-				</strong>
+				</span>
+			}
+			<div class={ "bg-pink-200 rounded-md px-4 py-2 w-fit", templ.KV("bg-cyan-200!", msg.UserID == userID) }>
 				{ msg.Content }
-			</p>
+			</div>
 		</li>
 	}
 	if (len(msgs) >= utils.MessagesLimit) {
@@ -115,8 +113,6 @@ templ OlderMessages(msgs []repository.GetPaginatedMessagesRow, userID string) {
 			hx-swap="beforeend"
 			hx-target="#chat_room"
 			hx-indicator="#indicator"
-		>
-			Load older messages
-		</li>
+		></li>
 	}
 }

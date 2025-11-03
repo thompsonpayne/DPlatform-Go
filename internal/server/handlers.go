@@ -263,7 +263,6 @@ func (s *Server) getChatRoomHanlder(c echo.Context) error {
 		}).Render(c.Request().Context(), c.Response())
 	}
 	msgs, err := s.messageSvc.ListFirst(c.Request().Context(), id)
-	log.Println("List messages:", msgs)
 	if err != nil {
 		c.Response().WriteHeader(http.StatusInternalServerError)
 		return toast.Toast(toast.Props{
@@ -286,11 +285,11 @@ func (s *Server) getChatRoomHanlder(c echo.Context) error {
 }
 
 func (s *Server) getMoreMessagesHandler(c echo.Context) error {
+	time.Sleep(time.Millisecond * 300) // NOTE: add delay on purpose, so that scrollbar has time to render to avoid continuous fetching, try removing this line and test scrollbar to see
 	roomID := c.Param("roomID")
 	createdAt := c.QueryParam("createdAt")
 
 	ca, err := time.Parse(time.RFC3339, createdAt)
-	ca = ca.Truncate(time.Second)
 	log.Println("Time param query", ca)
 	if err != nil {
 		log.Println("error converting time", err)

@@ -6,6 +6,7 @@ import "rplatform-echo/cmd/web/components/button"
 import "time"
 import "fmt"
 import "rplatform-echo/utils"
+import "rplatform-echo/cmd/web/components/icon"
 
 templ ChatRoom(room *repository.Room, userID string, email string, msgs []repository.GetInitalMessagesRow) {
 	@Base() {
@@ -18,17 +19,13 @@ templ ChatRoom(room *repository.Room, userID string, email string, msgs []reposi
 		<div class="text-xl font-bold py-4 text-center">Room { room.Name }</div>
 		<div hx-ext="ws" ws-connect={ "/dashboard/chatroom/" + room.ID }>
 			<div id="notifications"></div>
-			<div id="indicator" class="htmx-indicator">Loading...</div>
-			<ul class="text-slate-900 space-y-1" id="chat_room" data-user-id={ userID }>
-				if len(msgs) >= utils.MessagesLimit {
-					<li
-						hx-get={ fmt.Sprintf("/dashboard/room/%s/messages?createdAt=%s", room.ID, msgs[0].CreatedAt.Time.UTC().Format(time.RFC3339)) }
-						hx-trigger="revealed"
-						hx-swap="afterbegin"
-						hx-target="#chat_room"
-						hx-indicator="#indicator"
-					>Load older messages</li>
-				}
+			<div id="indicator" class="htmx-indicator flex justify-end py-1 gap-1">
+				@icon.LoaderCircle(icon.Props{
+					Class: "animate-spin",
+				})
+				Loading...
+			</div>
+			<ul class="text-slate-900 space-y-1 max-h-[400px] overflow-y-auto flex flex-col-reverse px-2" id="chat_room" data-user-id={ userID }>
 				for _, msg := range msgs {
 					<li
 						data-user-id={ userID }
@@ -45,6 +42,15 @@ templ ChatRoom(room *repository.Room, userID string, email string, msgs []reposi
 							{ msg.Content }
 						</p>
 					</li>
+				}
+				if len(msgs) >= utils.MessagesLimit {
+					<li
+						hx-get={ fmt.Sprintf("/dashboard/room/%s/messages?createdAt=%s", room.ID, msgs[len(msgs)-1].CreatedAt.Time.UTC().Format(time.RFC3339)) }
+						hx-trigger="intersect once"
+						hx-swap="beforeend"
+						hx-target="#chat_room"
+						hx-indicator="#indicator"
+					>Load older messages</li>
 				}
 			</ul>
 			<form
@@ -64,7 +70,7 @@ templ ChatRoom(room *repository.Room, userID string, email string, msgs []reposi
 
 // For a incomming chat
 templ ChatMessage(email string, message string, userID string, senderID string) {
-	<div id="chat_room" hx-swap-oob="beforeend">
+	<div id="chat_room" hx-swap-oob="afterbegin">
 		<li
 			data-user-id={ userID }
 			class={ "bg-pink-200 text-left rounded-md px-4 py-2 w-fit transition-transform duration-300", templ.KV("bg-cyan-200! text-right! ml-auto", senderID == userID) }
@@ -85,17 +91,6 @@ templ ChatMessage(email string, message string, userID string, senderID string) 
 
 // For lazy loading older chat messages
 templ OlderMessages(msgs []repository.GetPaginatedMessagesRow, userID string) {
-	if (len(msgs) >= utils.MessagesLimit) {
-		<li
-			hx-get={ fmt.Sprintf("/dashboard/room/%s/messages?createdAt=%s", msgs[0].RoomID, msgs[0].CreatedAt.Time.UTC().Format(time.RFC3339)) }
-			hx-trigger="revealed"
-			hx-swap="afterbegin"
-			hx-target="#chat_room"
-			hx-indicator="#indicator"
-		>
-			Load older messages
-		</li>
-	}
 	for _, msg := range msgs {
 		<li
 			data-user-id={ msg.UserID }
@@ -111,6 +106,17 @@ templ OlderMessages(msgs []repository.GetPaginatedMessagesRow, userID string) {
 				</strong>
 				{ msg.Content }
 			</p>
+		</li>
+	}
+	if (len(msgs) >= utils.MessagesLimit) {
+		<li
+			hx-get={ fmt.Sprintf("/dashboard/room/%s/messages?createdAt=%s", msgs[len(msgs)-1].RoomID, msgs[len(msgs)-1].CreatedAt.Time.UTC().Format(time.RFC3339)) }
+			hx-trigger="intersect once"
+			hx-swap="beforeend"
+			hx-target="#chat_room"
+			hx-indicator="#indicator"
+		>
+			Load older messages
 		</li>
 	}
 }

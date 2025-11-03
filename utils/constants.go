@@ -1,3 +1,3 @@
 package utils
 
-var MessagesLimit = 10
+var MessagesLimit = 15

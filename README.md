@@ -1,6 +1,6 @@
 # Project rplatform-echo
 
-One Paragraph of project description goes here
+Simple chat room app with htmx/go/templ/tailwindcss/templUI
 
 ## Getting Started
 
